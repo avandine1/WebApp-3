@@ -45,11 +45,31 @@
             z-index: 100;
         }
 
-        @media (max-width: 600px) {
+        /* Responsive adjustments for mobile devices */
+        @media (max-width: 900px) {
             #controls {
-                width: calc(100% - 80px);
+                width: 200px;
+                padding: 15px;
                 right: 10px;
                 top: 70px;
+                font-size: 13px;
+            }
+        }
+
+        /* Specifically handle landscape orientation on small screens */
+        @media (max-height: 500px) and (orientation: landscape) {
+            #controls {
+                width: 180px;
+                max-height: 70vh;
+                top: 60px;
+                padding: 10px;
+            }
+            .control-group {
+                margin-bottom: 8px;
+            }
+            #toggle-ui {
+                top: 10px;
+                right: 10px;
             }
         }
 
@@ -440,8 +460,17 @@
             tctx.textAlign = 'center';
             tctx.textBaseline = 'middle';
             
-            let dynamicFontSize = Math.min(w * 0.9 / (config.text.length * 0.6), config.fontSize);
-            if (w < h && w < 600) dynamicFontSize *= 0.8;
+            // Adjust font size for orientation
+            let dynamicFontSize;
+            const isLandscape = w > h;
+
+            if (isLandscape && h < 500) {
+                // Mobile landscape optimization: prioritize height to keep text within view
+                dynamicFontSize = Math.min(h * 0.6, config.fontSize);
+            } else {
+                dynamicFontSize = Math.min(w * 0.9 / (config.text.length * 0.6), config.fontSize);
+                if (w < h && w < 600) dynamicFontSize *= 0.8;
+            }
             
             tctx.font = `900 ${dynamicFontSize}px ${config.font}`;
             tctx.fillText(config.text, w / 2, h / 2);
@@ -449,7 +478,9 @@
             try {
                 const imageData = tctx.getImageData(0, 0, w, h);
                 const pixels = imageData.data;
-                const step = w < 600 ? config.density * 1.5 : config.density;
+                
+                // Use slightly coarser density on small screens/landscape for performance
+                const step = (w < 900) ? config.density * 1.5 : config.density;
 
                 for (let y = 0; y < h; y += step) {
                     for (let x = 0; x < w; x += step) {
