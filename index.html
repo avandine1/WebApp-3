@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Fluid Momentum Dissipation</title>
     <style>
         :root {
@@ -19,6 +19,7 @@
             overflow: hidden;
             background-color: var(--bg-color);
             cursor: crosshair;
+            touch-action: none;
         }
 
         canvas {
@@ -38,14 +39,22 @@
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             width: 240px;
             user-select: none;
-            max-height: 90vh;
+            max-height: 80vh;
             overflow-y: auto;
             transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease;
             z-index: 100;
         }
 
+        @media (max-width: 600px) {
+            #controls {
+                width: calc(100% - 80px);
+                right: 10px;
+                top: 70px;
+            }
+        }
+
         #controls.hidden {
-            transform: translateX(280px);
+            transform: translateX(120%);
             opacity: 0;
             pointer-events: none;
         }
@@ -57,8 +66,8 @@
             background: var(--panel-bg);
             border: 1px solid rgba(255, 255, 255, 0.1);
             color: white;
-            width: 40px;
-            height: 40px;
+            width: 44px;
+            height: 44px;
             border-radius: 50%;
             cursor: pointer;
             z-index: 101;
@@ -101,8 +110,8 @@
 
         input[type="range"]::-webkit-slider-thumb {
             appearance: none;
-            width: 12px;
-            height: 12px;
+            width: 16px;
+            height: 16px;
             background: #fff;
             border-radius: 50%;
             cursor: pointer;
@@ -114,9 +123,9 @@
             background: rgba(255, 255, 255, 0.05);
             border: 1px solid rgba(255, 255, 255, 0.2);
             color: white;
-            padding: 8px;
+            padding: 10px;
             border-radius: 4px;
-            font-size: 12px;
+            font-size: 14px;
             outline: none;
             box-sizing: border-box;
         }
@@ -130,12 +139,13 @@
             position: relative;
             cursor: move;
             overflow: hidden;
+            touch-action: none;
         }
 
         #wind-indicator {
             position: absolute;
-            width: 4px;
-            height: 4px;
+            width: 6px;
+            height: 6px;
             background: #fff;
             border-radius: 50%;
             top: 50%;
@@ -150,7 +160,7 @@
             background: rgba(255, 255, 255, 0.1);
             border: 1px solid rgba(255, 255, 255, 0.2);
             color: white;
-            padding: 10px;
+            padding: 12px;
             border-radius: 6px;
             font-size: 10px;
             text-transform: uppercase;
@@ -269,33 +279,53 @@
         
         function updateWind(e) {
             const rect = windPad.getBoundingClientRect();
-            const x = (e.clientX - rect.left) / rect.width;
-            const y = (e.clientY - rect.top) / rect.height;
-            const wx = (x - 0.5) * 2;
-            const wy = (y - 0.5) * 2;
+            // Handle both touch and mouse coords
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
+            const x = (clientX - rect.left) / rect.width;
+            const y = (clientY - rect.top) / rect.height;
+            const wx = (Math.max(0, Math.min(1, x)) - 0.5) * 2;
+            const wy = (Math.max(0, Math.min(1, y)) - 0.5) * 2;
             config.windX = wx * 0.15;
             config.windY = wy * 0.15;
-            windIndicator.style.left = `${x * 100}%`;
-            windIndicator.style.top = `${y * 100}%`;
+            windIndicator.style.left = `${Math.max(0, Math.min(1, x)) * 100}%`;
+            windIndicator.style.top = `${Math.max(0, Math.min(1, y)) * 100}%`;
         }
 
-        windPad.addEventListener('mousedown', (e) => {
+        const handleWindDown = (e) => {
             updateWind(e);
-            const moveHandler = (me) => updateWind(me);
+            const moveHandler = (me) => {
+                me.preventDefault();
+                updateWind(me);
+            };
             const upHandler = () => {
                 window.removeEventListener('mousemove', moveHandler);
                 window.removeEventListener('mouseup', upHandler);
+                window.removeEventListener('touchmove', moveHandler);
+                window.removeEventListener('touchend', upHandler);
             };
             window.addEventListener('mousemove', moveHandler);
             window.addEventListener('mouseup', upHandler);
-        });
+            window.addEventListener('touchmove', moveHandler, { passive: false });
+            window.addEventListener('touchend', upHandler);
+        };
 
-        window.addEventListener('mousemove', (e) => {
-            mouse.vx = e.clientX - mouse.lastX;
-            mouse.vy = e.clientY - mouse.lastY;
-            mouse.x = e.clientX;
-            mouse.y = e.clientY;
-        });
+        windPad.addEventListener('mousedown', handleWindDown);
+        windPad.addEventListener('touchstart', handleWindDown, { passive: false });
+
+        const handlePointerMove = (e) => {
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+            
+            mouse.vx = clientX - mouse.lastX;
+            mouse.vy = clientY - mouse.lastY;
+            mouse.x = clientX;
+            mouse.y = clientY;
+        };
+
+        window.addEventListener('mousemove', handlePointerMove);
+        window.addEventListener('touchmove', handlePointerMove, { passive: true });
 
         window.addEventListener('resize', () => {
             init();
@@ -387,7 +417,6 @@
             const w = window.innerWidth;
             const h = window.innerHeight;
             
-            // Safety check for 0 dimensions which can trigger IndexSizeError
             if (w <= 0 || h <= 0) return;
 
             canvas.width = w;
@@ -402,16 +431,22 @@
             tctx.textBaseline = 'middle';
             
             let dynamicFontSize = Math.min(w * 0.9 / (config.text.length * 0.6), config.fontSize);
+            // Smaller text on mobile portrait
+            if (w < h && w < 600) dynamicFontSize *= 0.8;
+            
             tctx.font = `900 ${dynamicFontSize}px ${config.font}`;
             tctx.fillText(config.text, w / 2, h / 2);
 
             try {
                 const imageData = tctx.getImageData(0, 0, w, h);
                 const pixels = imageData.data;
+                
+                // Increase density slightly on mobile for performance
+                const step = w < 600 ? config.density * 1.5 : config.density;
 
-                for (let y = 0; y < h; y += config.density) {
-                    for (let x = 0; x < w; x += config.density) {
-                        const index = (y * w + x) * 4;
+                for (let y = 0; y < h; y += step) {
+                    for (let x = 0; x < w; x += step) {
+                        const index = (Math.floor(y) * w + Math.floor(x)) * 4;
                         if (pixels[index + 3] > 128) {
                             particles.push(new Particle(x, y));
                         }
