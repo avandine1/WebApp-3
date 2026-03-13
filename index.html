@@ -261,7 +261,9 @@
 
         // Toggle UI
         const controls = document.getElementById('controls');
-        document.getElementById('toggle-ui').addEventListener('click', () => {
+        const toggleBtn = document.getElementById('toggle-ui');
+        toggleBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
             controls.classList.toggle('hidden');
         });
 
@@ -272,14 +274,13 @@
         document.getElementById('gravity').addEventListener('input', (e) => config.gravity = parseFloat(e.target.value));
         document.getElementById('amp').addEventListener('input', (e) => config.turbulenceIntensity = parseFloat(e.target.value));
         document.getElementById('freq').addEventListener('input', (e) => config.flowScale = parseFloat(e.target.value));
-        document.getElementById('reset-btn').addEventListener('click', init);
+        document.getElementById('reset-btn').addEventListener('click', (e) => { e.stopPropagation(); init(); });
         
         const windPad = document.getElementById('windPad');
         const windIndicator = document.getElementById('wind-indicator');
         
         function updateWind(e) {
             const rect = windPad.getBoundingClientRect();
-            // Handle both touch and mouse coords
             const clientX = e.touches ? e.touches[0].clientX : e.clientX;
             const clientY = e.touches ? e.touches[0].clientY : e.clientY;
 
@@ -294,6 +295,7 @@
         }
 
         const handleWindDown = (e) => {
+            e.stopPropagation();
             updateWind(e);
             const moveHandler = (me) => {
                 me.preventDefault();
@@ -315,6 +317,14 @@
         windPad.addEventListener('touchstart', handleWindDown, { passive: false });
 
         const handlePointerMove = (e) => {
+            // Check if pointer is over UI elements
+            if (e.target.closest('#controls') || e.target.closest('#toggle-ui')) {
+                // Keep coordinates far away to stop interaction
+                mouse.x = -2000;
+                mouse.y = -2000;
+                return;
+            }
+
             const clientX = e.touches ? e.touches[0].clientX : e.clientX;
             const clientY = e.touches ? e.touches[0].clientY : e.clientY;
             
@@ -431,7 +441,6 @@
             tctx.textBaseline = 'middle';
             
             let dynamicFontSize = Math.min(w * 0.9 / (config.text.length * 0.6), config.fontSize);
-            // Smaller text on mobile portrait
             if (w < h && w < 600) dynamicFontSize *= 0.8;
             
             tctx.font = `900 ${dynamicFontSize}px ${config.font}`;
@@ -440,8 +449,6 @@
             try {
                 const imageData = tctx.getImageData(0, 0, w, h);
                 const pixels = imageData.data;
-                
-                // Increase density slightly on mobile for performance
                 const step = w < 600 ? config.density * 1.5 : config.density;
 
                 for (let y = 0; y < h; y += step) {
