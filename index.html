@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fluid Momentum Dissipation</title>
+    <style>
+        :root {
+            --bg-color: #050505;
+            --accent: rgba(255, 255, 255, 0.8);
+            --panel-bg: rgba(20, 20, 20, 0.85);
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: var(--bg-color);
+            cursor: crosshair;
+        }
+
+        canvas {
+            display: block;
+        }
+
+        #controls {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: var(--panel-bg);
+            backdrop-filter: blur(15px);
+            padding: 20px;
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: var(--accent);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            width: 240px;
+            user-select: none;
+            max-height: 90vh;
+            overflow-y: auto;
+            transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease;
+            z-index: 100;
+        }
+
+        #controls.hidden {
+            transform: translateX(280px);
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        #toggle-ui {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: var(--panel-bg);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: white;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            cursor: pointer;
+            z-index: 101;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            transition: background 0.2s;
+        }
+
+        #toggle-ui:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .control-group {
+            margin-bottom: 15px;
+        }
+
+        .control-group:last-child {
+            margin-bottom: 0;
+        }
+
+        label {
+            display: block;
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 8px;
+            opacity: 0.7;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            appearance: none;
+            background: rgba(255, 255, 255, 0.1);
+            height: 4px;
+            border-radius: 2px;
+            outline: none;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            appearance: none;
+            width: 12px;
+            height: 12px;
+            background: #fff;
+            border-radius: 50%;
+            cursor: pointer;
+            transition: transform 0.1s ease;
+        }
+
+        input[type="text"], select {
+            width: 100%;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: white;
+            padding: 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            outline: none;
+            box-sizing: border-box;
+        }
+
+        .wind-pad {
+            width: 100%;
+            height: 70px;
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 6px;
+            position: relative;
+            cursor: move;
+            overflow: hidden;
+        }
+
+        #wind-indicator {
+            position: absolute;
+            width: 4px;
+            height: 4px;
+            background: #fff;
+            border-radius: 50%;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+            box-shadow: 0 0 10px #fff;
+        }
+
+        #reset-btn {
+            width: 100%;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: white;
+            padding: 10px;
+            border-radius: 6px;
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            cursor: pointer;
+            transition: background 0.2s;
+            margin-top: 10px;
+        }
+
+        #reset-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+    </style>
+</head>
+<body>
+
+    <button id="toggle-ui">⚙</button>
+
+    <div id="controls">
+        <div class="control-group">
+            <label>Text Content</label>
+            <input type="text" id="textContent" value="FLUID" spellcheck="false">
+        </div>
+        <div class="control-group">
+            <label>Font Style</label>
+            <select id="fontFamily">
+                <option value="sans-serif">Sans Serif</option>
+                <option value="serif">Serif</option>
+                <option value="monospace">Monospace</option>
+                <option value="Impact">Impact</option>
+                <option value="Georgia">Georgia</option>
+            </select>
+        </div>
+        <div class="control-group">
+            <label>Emitter Size</label>
+            <input type="range" id="radius" min="10" max="150" step="1" value="40">
+        </div>
+        <div class="control-group">
+            <label>Gravity</label>
+            <input type="range" id="gravity" min="-0.1" max="0.1" step="0.001" value="0">
+        </div>
+        <div class="control-group">
+            <label>Turbulence Intensity</label>
+            <input type="range" id="amp" min="0" max="3" step="0.01" value="0.65">
+        </div>
+        <div class="control-group">
+            <label>Turbulence Scale</label>
+            <input type="range" id="freq" min="0.001" max="0.05" step="0.001" value="0.012">
+        </div>
+        <div class="control-group">
+            <label>Wind Control (Pad)</label>
+            <div class="wind-pad" id="windPad">
+                <div id="wind-indicator"></div>
+            </div>
+        </div>
+        <button id="reset-btn">Reset Simulation</button>
+    </div>
+
+    <canvas id="canvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+
+        let particles = [];
+        let mouse = { x: -1000, y: -1000, vx: 0, vy: 0, lastX: -1000, lastY: -1000 }; 
+        
+        const config = {
+            text: "FLUID",
+            font: "sans-serif",
+            fontSize: 180,
+            density: 2, 
+            friction: 0.97, 
+            momentumFactor: 0.85, 
+            maxSpeed: 8,
+            decay: 0.985, 
+            sizeDecay: 0.98, 
+            flowScale: 0.012, 
+            turbulenceIntensity: 0.65, 
+            distortionFrequency: 0.015,
+            distortionAmplitude: 35,
+            emitterRadius: 40,
+            gravity: 0,
+            windX: 0,
+            windY: 0
+        };
+
+        const textCanvas = document.createElement('canvas');
+        const tctx = textCanvas.getContext('2d');
+
+        function distToSegment(p, v, w) {
+            const l2 = (v.x - w.x) ** 2 + (v.y - w.y) ** 2;
+            if (l2 === 0) return Math.sqrt((p.x - v.x) ** 2 + (p.y - v.y) ** 2);
+            let t = ((p.x - v.x) * (w.x - v.x) + (p.y - v.y) * (w.y - v.y)) / l2;
+            t = Math.max(0, Math.min(1, t));
+            return Math.sqrt((p.x - (v.x + t * (w.x - v.x))) ** 2 + (p.y - (v.y + t * (w.y - v.y))) ** 2);
+        }
+
+        // Toggle UI
+        const controls = document.getElementById('controls');
+        document.getElementById('toggle-ui').addEventListener('click', () => {
+            controls.classList.toggle('hidden');
+        });
+
+        // UI Event Listeners
+        document.getElementById('textContent').addEventListener('input', (e) => { config.text = e.target.value || " "; init(); });
+        document.getElementById('fontFamily').addEventListener('change', (e) => { config.font = e.target.value; init(); });
+        document.getElementById('radius').addEventListener('input', (e) => config.emitterRadius = parseFloat(e.target.value));
+        document.getElementById('gravity').addEventListener('input', (e) => config.gravity = parseFloat(e.target.value));
+        document.getElementById('amp').addEventListener('input', (e) => config.turbulenceIntensity = parseFloat(e.target.value));
+        document.getElementById('freq').addEventListener('input', (e) => config.flowScale = parseFloat(e.target.value));
+        document.getElementById('reset-btn').addEventListener('click', init);
+        
+        const windPad = document.getElementById('windPad');
+        const windIndicator = document.getElementById('wind-indicator');
+        
+        function updateWind(e) {
+            const rect = windPad.getBoundingClientRect();
+            const x = (e.clientX - rect.left) / rect.width;
+            const y = (e.clientY - rect.top) / rect.height;
+            const wx = (x - 0.5) * 2;
+            const wy = (y - 0.5) * 2;
+            config.windX = wx * 0.15;
+            config.windY = wy * 0.15;
+            windIndicator.style.left = `${x * 100}%`;
+            windIndicator.style.top = `${y * 100}%`;
+        }
+
+        windPad.addEventListener('mousedown', (e) => {
+            updateWind(e);
+            const moveHandler = (me) => updateWind(me);
+            const upHandler = () => {
+                window.removeEventListener('mousemove', moveHandler);
+                window.removeEventListener('mouseup', upHandler);
+            };
+            window.addEventListener('mousemove', moveHandler);
+            window.addEventListener('mouseup', upHandler);
+        });
+
+        window.addEventListener('mousemove', (e) => {
+            mouse.vx = e.clientX - mouse.lastX;
+            mouse.vy = e.clientY - mouse.lastY;
+            mouse.x = e.clientX;
+            mouse.y = e.clientY;
+        });
+
+        window.addEventListener('resize', () => {
+            init();
+        });
+
+        class Particle {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.originX = x;
+                this.originY = y;
+                this.vx = 0;
+                this.vy = 0;
+                this.size = Math.random() * 2 + 1.5;
+                this.active = false; 
+                this.opacity = 1;
+            }
+
+            limitSpeed() {
+                const speed = Math.sqrt(this.vx * this.vx + this.vy * this.vy);
+                if (speed > config.maxSpeed) {
+                    const ratio = config.maxSpeed / speed;
+                    this.vx *= ratio;
+                    this.vy *= ratio;
+                }
+            }
+
+            update() {
+                if (!this.active) {
+                    const dist = distToSegment(
+                        {x: this.originX, y: this.originY}, 
+                        {x: mouse.lastX, y: mouse.lastY}, 
+                        {x: mouse.x, y: mouse.y}
+                    );
+
+                    let time = Date.now() * config.distortionFrequency;
+                    let noise = Math.sin(this.originX * 0.1 + time) + Math.cos(this.originY * 0.1 - time * 0.8);
+                    let dynamicRadius = config.emitterRadius + (noise * config.distortionAmplitude);
+
+                    if (dist < dynamicRadius) {
+                        const speed = Math.sqrt(mouse.vx * mouse.vx + mouse.vy * mouse.vy);
+                        if (speed > 0.4) {
+                            this.active = true;
+                            this.vx = mouse.vx * config.momentumFactor + (Math.random() - 0.5);
+                            this.vy = mouse.vy * config.momentumFactor + (Math.random() - 0.5);
+                            this.limitSpeed();
+                            eraseFromText(this.originX, this.originY);
+                        }
+                    }
+                    return;
+                }
+
+                let flowTime = Date.now() * 0.0003; 
+                let angle = (Math.sin(this.x * config.flowScale + flowTime) + Math.cos(this.y * config.flowScale + flowTime)) * Math.PI * 2;
+                
+                this.vx += Math.cos(angle) * config.turbulenceIntensity * 0.1 + config.windX;
+                this.vy += Math.sin(angle) * config.turbulenceIntensity * 0.1 + config.windY + config.gravity;
+                
+                this.limitSpeed();
+
+                this.x += this.vx;
+                this.y += this.vy;
+                this.vx *= config.friction;
+                this.vy *= config.friction;
+                this.size *= config.sizeDecay;
+                this.opacity *= config.decay;
+            }
+
+            draw() {
+                if (!this.active || this.opacity <= 0.01) return;
+                ctx.fillStyle = `rgba(255, 255, 255, ${this.opacity})`;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        function eraseFromText(x, y) {
+            tctx.save();
+            tctx.globalCompositeOperation = 'destination-out';
+            tctx.beginPath();
+            let r = (config.density * 1.5) + (Math.random() * 3);
+            tctx.arc(x, y, r, 0, Math.PI * 2);
+            tctx.fill();
+            tctx.restore();
+        }
+
+        function init() {
+            const w = window.innerWidth;
+            const h = window.innerHeight;
+            
+            // Safety check for 0 dimensions which can trigger IndexSizeError
+            if (w <= 0 || h <= 0) return;
+
+            canvas.width = w;
+            canvas.height = h;
+            textCanvas.width = w;
+            textCanvas.height = h;
+            particles = [];
+
+            tctx.clearRect(0, 0, w, h);
+            tctx.fillStyle = 'white';
+            tctx.textAlign = 'center';
+            tctx.textBaseline = 'middle';
+            
+            let dynamicFontSize = Math.min(w * 0.9 / (config.text.length * 0.6), config.fontSize);
+            tctx.font = `900 ${dynamicFontSize}px ${config.font}`;
+            tctx.fillText(config.text, w / 2, h / 2);
+
+            try {
+                const imageData = tctx.getImageData(0, 0, w, h);
+                const pixels = imageData.data;
+
+                for (let y = 0; y < h; y += config.density) {
+                    for (let x = 0; x < w; x += config.density) {
+                        const index = (y * w + x) * 4;
+                        if (pixels[index + 3] > 128) {
+                            particles.push(new Particle(x, y));
+                        }
+                    }
+                }
+            } catch (e) {
+                console.error("Initialization failed:", e);
+            }
+        }
+
+        function animate() {
+            ctx.fillStyle = '#050505';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(textCanvas, 0, 0);
+
+            for (let i = 0; i < particles.length; i++) {
+                particles[i].update();
+                particles[i].draw();
+                if (particles[i].active && (particles[i].size < 0.05 || particles[i].opacity < 0.01)) {
+                    particles.splice(i, 1);
+                    i--;
+                }
+            }
+            mouse.lastX = mouse.x;
+            mouse.lastY = mouse.y;
+            requestAnimationFrame(animate);
+        }
+
+        window.onload = function() {
+            init();
+            animate();
+        }
+    </script>
+</body>
+</html>
